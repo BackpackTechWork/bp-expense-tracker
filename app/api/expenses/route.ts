@@ -7,6 +7,7 @@ import {
     paginationSchema,
 } from "@/lib/validations";
 import { handleApiError, AppError } from "@/lib/error-handler";
+import { ensureSessionUser } from "@/lib/auth-utils";
 
 export async function GET(request: NextRequest) {
     try {
@@ -129,6 +130,24 @@ export async function POST(request: NextRequest) {
             receiptUrl = `/uploads/${Date.now()}-${receiptFile.name}`;
         }
 
+        // Ensure session user exists in database
+        const sessionUser = await ensureSessionUser(session);
+
+        // Verify category exists
+        const category = await prisma.category.findUnique({
+            where: { id: validatedData.categoryId },
+        });
+
+        if (!category) {
+            console.error("Category not found:", {
+                categoryId: validatedData.categoryId,
+                availableCategories: await prisma.category.findMany({
+                    select: { id: true, name: true },
+                }),
+            });
+            throw new AppError("Category not found", 404, "CATEGORY_NOT_FOUND");
+        }
+
         const expense = await prisma.expense.create({
             data: {
                 amount: validatedData.amount,
@@ -144,14 +163,19 @@ export async function POST(request: NextRequest) {
             },
         });
 
-        // Log activity
-        await prisma.activityLog.create({
-            data: {
-                userId: session.user.id,
-                action: "EXPENSE_CREATED",
-                details: `Created expense: ${validatedData.description} - $${validatedData.amount}`,
-            },
-        });
+        // Log activity (safe to do since we verified user exists)
+        try {
+            await prisma.activityLog.create({
+                data: {
+                    userId: session.user.id,
+                    action: "EXPENSE_CREATED",
+                    details: `Created expense: ${validatedData.description} - $${validatedData.amount}`,
+                },
+            });
+        } catch (logError) {
+            // Don't fail the main operation if logging fails
+            console.error("Failed to log activity:", logError);
+        }
 
         return NextResponse.json({ expense }, { status: 201 });
     } catch (error) {

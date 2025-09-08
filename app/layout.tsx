@@ -5,6 +5,7 @@ import { GeistMono } from "geist/font/mono";
 import { Analytics } from "@vercel/analytics/next";
 import { SessionProviderWrapper } from "./providers/session-provider";
 import { QueryProvider } from "./providers/query-provider";
+import { Toaster } from "@/components/ui/toaster";
 import { Suspense } from "react";
 import "./globals.css";
 
@@ -33,6 +34,7 @@ export default function RootLayout({
                         <QueryProvider>{children}</QueryProvider>
                     </SessionProviderWrapper>
                 </Suspense>
+                <Toaster />
                 <Analytics />
             </body>
         </html>

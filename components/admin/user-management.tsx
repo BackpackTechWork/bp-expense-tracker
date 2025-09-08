@@ -1,194 +1,372 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import { useRouter } from "next/navigation"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { Input } from "@/components/ui/input"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog"
-import { Search, Ban, CheckCircle, Eye } from "lucide-react"
-import { formatDistanceToNow } from "date-fns"
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from "@/components/ui/table";
+import { Eye, Edit } from "lucide-react";
+import { formatDistanceToNow } from "date-fns";
+import { useToast } from "@/hooks/use-toast";
+import { Loader } from "@/components/ui/loader";
+import { Pagination } from "@/components/ui/pagination";
+import { FilterBar } from "@/components/ui/filters";
+import { ErrorMessage } from "@/components/ui/error-message";
+import { useUsers } from "@/hooks/use-users";
+import {
+    CreateUserModal,
+    EditUserModal,
+    BanUserModal,
+    ResetPasswordModal,
+} from "@/components/admin/modals";
 
 interface User {
-  id: string
-  name: string | null
-  email: string
-  role: string
-  isActive: boolean
-  isBanned: boolean
-  lastLoginAt: Date | null
-  createdAt: Date
-  _count: {
-    expenses: number
-    activityLogs: number
-  }
+    id: string;
+    name: string | null;
+    email: string;
+    role: string;
+    isActive: boolean;
+    isBanned: boolean;
+    lastLoginAt: Date | null;
+    createdAt: Date;
+    _count: {
+        expenses: number;
+        activityLogs: number;
+    };
 }
 
 interface UserManagementProps {
-  users: User[]
+    initialUsers?: User[];
 }
 
-export function UserManagement({ users }: UserManagementProps) {
-  const [searchTerm, setSearchTerm] = useState("")
-  const [isLoading, setIsLoading] = useState(false)
-  const router = useRouter()
+export function UserManagement({ initialUsers = [] }: UserManagementProps) {
+    const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+    const [editingUser, setEditingUser] = useState<User | null>(null);
 
-  const filteredUsers = users.filter(
-    (user) =>
-      user.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.email.toLowerCase().includes(searchTerm.toLowerCase()),
-  )
+    // Local state for pagination and filters
+    const [currentPage, setCurrentPage] = useState(1);
+    const [pageSize, setPageSize] = useState(10);
+    const [filters, setFilters] = useState({
+        search: "",
+        role: "",
+        status: "",
+    });
 
-  const handleBanUser = async (userId: string, shouldBan: boolean) => {
-    setIsLoading(true)
-    try {
-      const response = await fetch(`/api/admin/users/${userId}/ban`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ banned: shouldBan }),
-      })
+    const router = useRouter();
 
-      if (response.ok) {
-        router.refresh()
-      }
-    } catch (error) {
-      console.error("Error updating user:", error)
-    } finally {
-      setIsLoading(false)
-    }
-  }
+    // Use React Query to fetch users
+    const {
+        data,
+        isLoading,
+        isFetching,
+        isError,
+        error,
+        refetch,
+        invalidateUsers,
+    } = useUsers({
+        filters,
+        pagination: { page: currentPage, pageSize },
+    });
 
-  const getUserStatus = (user: User) => {
-    if (user.isBanned) {
-      return <Badge variant="destructive">Banned</Badge>
-    }
-    if (user.isActive) {
-      return (
-        <Badge variant="default" className="bg-green-100 text-green-800">
-          Active
-        </Badge>
-      )
-    }
-    return <Badge variant="secondary">Inactive</Badge>
-  }
+    // Extract users and pagination from the response
+    const users = data?.users || [];
+    const pagination = data?.pagination || {
+        currentPage: 1,
+        totalPages: 1,
+        totalUsers: 0,
+        pageSize: 10,
+        hasNextPage: false,
+        hasPreviousPage: false,
+    };
 
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center justify-between">
-          <span>Users ({filteredUsers.length})</span>
-          <div className="relative w-64">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-            <Input
-              placeholder="Search users..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
-            />
-          </div>
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>User</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Expenses</TableHead>
-                <TableHead>Last Login</TableHead>
-                <TableHead>Joined</TableHead>
-                <TableHead>Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredUsers.map((user) => (
-                <TableRow key={user.id}>
-                  <TableCell>
-                    <div>
-                      <div className="font-medium">{user.name || "No name"}</div>
-                      <div className="text-sm text-gray-500">{user.email}</div>
-                      {user.role === "ADMIN" && (
-                        <Badge variant="outline" className="mt-1">
-                          Admin
-                        </Badge>
-                      )}
+    // Helper functions for pagination and filters
+    const updateFilters = (newFilters: Partial<typeof filters>) => {
+        setFilters((prev) => ({ ...prev, ...newFilters }));
+        setCurrentPage(1); // Reset to first page when filters change
+    };
+
+    const clearFilters = () => {
+        setFilters({ search: "", role: "", status: "" });
+        setCurrentPage(1);
+    };
+
+    const setPage = (page: number) => {
+        setCurrentPage(page);
+    };
+
+    const handlePageSizeChange = (newPageSize: number) => {
+        setPageSize(newPageSize);
+        setCurrentPage(1); // Reset to first page when page size changes
+    };
+
+    // Filter options for the filter bar
+    const roleOptions = [
+        { value: "USER", label: "User" },
+        { value: "ADMIN", label: "Admin" },
+    ];
+
+    const statusOptions = [
+        { value: "active", label: "Active" },
+        { value: "inactive", label: "Inactive" },
+        { value: "banned", label: "Banned" },
+    ];
+
+    const openEditDialog = (user: User) => {
+        setEditingUser(user);
+        setIsEditDialogOpen(true);
+    };
+
+    const getUserStatus = (user: User) => {
+        if (user.isBanned) {
+            return <Badge variant="destructive">Banned</Badge>;
+        }
+        if (user.isActive) {
+            return (
+                <Badge
+                    variant="default"
+                    className="bg-green-100 text-green-800"
+                >
+                    Active
+                </Badge>
+            );
+        }
+        return <Badge variant="secondary">Inactive</Badge>;
+    };
+
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                        <span>Users ({pagination.totalUsers})</span>
+                        {isFetching && !isLoading && (
+                            <div className="flex items-center gap-1 text-sm text-gray-500">
+                                <Loader size="sm" />
+                                <span>Updating...</span>
+                            </div>
+                        )}
                     </div>
-                  </TableCell>
-                  <TableCell>{getUserStatus(user)}</TableCell>
-                  <TableCell>{user._count.expenses}</TableCell>
-                  <TableCell>
-                    {user.lastLoginAt ? (
-                      <span className="text-sm">
-                        {formatDistanceToNow(new Date(user.lastLoginAt), { addSuffix: true })}
-                      </span>
-                    ) : (
-                      <span className="text-sm text-gray-400">Never</span>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <span className="text-sm">
-                      {formatDistanceToNow(new Date(user.createdAt), { addSuffix: true })}
-                    </span>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center space-x-2">
-                      <Button variant="outline" size="sm" onClick={() => router.push(`/admin/users/${user.id}`)}>
-                        <Eye className="h-4 w-4" />
-                      </Button>
+                    <div className="flex items-center gap-4">
+                        <CreateUserModal />
+                    </div>
+                </CardTitle>
+            </CardHeader>
 
-                      {user.role !== "ADMIN" && (
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button variant={user.isBanned ? "default" : "destructive"} size="sm" disabled={isLoading}>
-                              {user.isBanned ? <CheckCircle className="h-4 w-4" /> : <Ban className="h-4 w-4" />}
-                            </Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>{user.isBanned ? "Unban User" : "Ban User"}</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                {user.isBanned
-                                  ? `Are you sure you want to unban ${user.name || user.email}? They will be able to access their account again.`
-                                  : `Are you sure you want to ban ${user.name || user.email}? They will not be able to access their account.`}
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>Cancel</AlertDialogCancel>
-                              <AlertDialogAction
-                                onClick={() => handleBanUser(user.id, !user.isBanned)}
-                                className={
-                                  user.isBanned ? "bg-green-600 hover:bg-green-700" : "bg-red-600 hover:bg-red-700"
+            {/* Filter Bar */}
+            <div className="px-6 pb-4">
+                <FilterBar
+                    searchValue={filters.search}
+                    onSearchChange={(value) => updateFilters({ search: value })}
+                    searchPlaceholder="Search users by name or email..."
+                    filters={[
+                        {
+                            key: "role",
+                            label: "Role",
+                            value: filters.role,
+                            onChange: (value) =>
+                                updateFilters({
+                                    role: value === "all" ? "" : value,
+                                }),
+                            options: roleOptions,
+                            placeholder: "Filter by role",
+                        },
+                        {
+                            key: "status",
+                            label: "Status",
+                            value: filters.status,
+                            onChange: (value) =>
+                                updateFilters({
+                                    status: value === "all" ? "" : value,
+                                }),
+                            options: statusOptions,
+                            placeholder: "Filter by status",
+                        },
+                    ]}
+                    onClearAll={clearFilters}
+                    showClearAll={true}
+                />
+            </div>
+
+            <CardContent>
+                {isError ? (
+                    <div className="flex flex-col items-center justify-center py-8 space-y-4">
+                        <div className="text-center">
+                            <h3 className="text-lg font-semibold text-red-600 mb-2">
+                                Failed to load users
+                            </h3>
+                            <ErrorMessage
+                                message={
+                                    error instanceof Error
+                                        ? error.message
+                                        : "An unexpected error occurred"
                                 }
-                              >
-                                {user.isBanned ? "Unban" : "Ban"}
-                              </AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
-                      )}
+                                className="text-gray-600 mb-4"
+                            />
+                            <Button onClick={() => refetch()} variant="outline">
+                                Try Again
+                            </Button>
+                        </div>
                     </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
-      </CardContent>
-    </Card>
-  )
+                ) : isLoading ? (
+                    <div className="flex justify-center py-8">
+                        <Loader />
+                    </div>
+                ) : (
+                    <>
+                        <div className="overflow-x-auto">
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>User</TableHead>
+                                        <TableHead>Role</TableHead>
+                                        <TableHead>Status</TableHead>
+                                        <TableHead>Expenses</TableHead>
+                                        <TableHead>Last Login</TableHead>
+                                        <TableHead>Joined</TableHead>
+                                        <TableHead>Actions</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {users.map((user) => (
+                                        <TableRow key={user.id}>
+                                            <TableCell>
+                                                <div>
+                                                    <div className="font-medium">
+                                                        {user.name || "No name"}
+                                                    </div>
+                                                    <div className="text-sm text-gray-500">
+                                                        {user.email}
+                                                    </div>
+                                                </div>
+                                            </TableCell>
+                                            <TableCell>
+                                                <Badge
+                                                    variant={
+                                                        user.role === "ADMIN"
+                                                            ? "default"
+                                                            : "secondary"
+                                                    }
+                                                >
+                                                    {user.role}
+                                                </Badge>
+                                            </TableCell>
+                                            <TableCell>
+                                                {getUserStatus(user)}
+                                            </TableCell>
+                                            <TableCell>
+                                                {user._count.expenses}
+                                            </TableCell>
+                                            <TableCell>
+                                                {user.lastLoginAt ? (
+                                                    <span className="text-sm">
+                                                        {formatDistanceToNow(
+                                                            new Date(
+                                                                user.lastLoginAt
+                                                            ),
+                                                            { addSuffix: true }
+                                                        )}
+                                                    </span>
+                                                ) : (
+                                                    <span className="text-sm text-gray-400">
+                                                        Never
+                                                    </span>
+                                                )}
+                                            </TableCell>
+                                            <TableCell>
+                                                <span className="text-sm">
+                                                    {formatDistanceToNow(
+                                                        new Date(
+                                                            user.createdAt
+                                                        ),
+                                                        { addSuffix: true }
+                                                    )}
+                                                </span>
+                                            </TableCell>
+                                            <TableCell>
+                                                <div className="flex items-center space-x-2">
+                                                    <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        onClick={() =>
+                                                            router.push(
+                                                                `/admin/users/${user.id}`
+                                                            )
+                                                        }
+                                                    >
+                                                        <Eye className="h-4 w-4" />
+                                                    </Button>
+
+                                                    <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        onClick={() =>
+                                                            openEditDialog(user)
+                                                        }
+                                                    >
+                                                        <Edit className="h-4 w-4" />
+                                                    </Button>
+
+                                                    {user.role !== "ADMIN" && (
+                                                        <>
+                                                            <ResetPasswordModal
+                                                                user={user}
+                                                                disabled={
+                                                                    isLoading
+                                                                }
+                                                            />
+                                                            <BanUserModal
+                                                                user={user}
+                                                                disabled={
+                                                                    isLoading
+                                                                }
+                                                            />
+                                                        </>
+                                                    )}
+                                                </div>
+                                            </TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        </div>
+
+                        {/* Pagination */}
+                        <div className="px-6 py-4 border-t">
+                            <Pagination
+                                currentPage={pagination.currentPage}
+                                totalPages={pagination.totalPages}
+                                totalItems={pagination.totalUsers}
+                                pageSize={pagination.pageSize}
+                                onPageChange={setPage}
+                                onPageSizeChange={handlePageSizeChange}
+                                pageSizeOptions={[5, 10, 20, 50]}
+                                showPageSizeSelector={true}
+                                showItemCount={true}
+                            />
+                        </div>
+                    </>
+                )}
+            </CardContent>
+
+            {/* Edit User Dialog */}
+            <EditUserModal
+                user={editingUser}
+                isOpen={isEditDialogOpen}
+                onOpenChange={(open) => {
+                    setIsEditDialogOpen(open);
+                    if (!open) {
+                        setEditingUser(null);
+                    }
+                }}
+            />
+        </Card>
+    );
 }

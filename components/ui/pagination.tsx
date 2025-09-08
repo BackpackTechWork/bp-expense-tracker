@@ -1,127 +1,184 @@
-import * as React from "react"
+"use client";
+
+import { Button } from "@/components/ui/button";
 import {
-  ChevronLeftIcon,
-  ChevronRightIcon,
-  MoreHorizontalIcon,
-} from "lucide-react"
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
+import {
+    ChevronLeft,
+    ChevronRight,
+    ChevronsLeft,
+    ChevronsRight,
+} from "lucide-react";
+import { cn } from "@/lib/utils";
 
-import { cn } from "@/lib/utils"
-import { Button, buttonVariants } from "@/components/ui/button"
-
-function Pagination({ className, ...props }: React.ComponentProps<"nav">) {
-  return (
-    <nav
-      role="navigation"
-      aria-label="pagination"
-      data-slot="pagination"
-      className={cn("mx-auto flex w-full justify-center", className)}
-      {...props}
-    />
-  )
+interface PaginationProps {
+    currentPage: number;
+    totalPages: number;
+    totalItems: number;
+    pageSize: number;
+    onPageChange: (page: number) => void;
+    onPageSizeChange: (pageSize: number) => void;
+    pageSizeOptions?: number[];
+    showPageSizeSelector?: boolean;
+    showItemCount?: boolean;
+    className?: string;
 }
 
-function PaginationContent({
-  className,
-  ...props
-}: React.ComponentProps<"ul">) {
-  return (
-    <ul
-      data-slot="pagination-content"
-      className={cn("flex flex-row items-center gap-1", className)}
-      {...props}
-    />
-  )
-}
+export function Pagination({
+    currentPage,
+    totalPages,
+    totalItems,
+    pageSize,
+    onPageChange,
+    onPageSizeChange,
+    pageSizeOptions = [10, 20, 50, 100],
+    showPageSizeSelector = true,
+    showItemCount = true,
+    className,
+}: PaginationProps) {
+    const startItem = (currentPage - 1) * pageSize + 1;
+    const endItem = Math.min(currentPage * pageSize, totalItems);
 
-function PaginationItem({ ...props }: React.ComponentProps<"li">) {
-  return <li data-slot="pagination-item" {...props} />
-}
+    const handleFirstPage = () => onPageChange(1);
+    const handlePreviousPage = () => onPageChange(Math.max(1, currentPage - 1));
+    const handleNextPage = () =>
+        onPageChange(Math.min(totalPages, currentPage + 1));
+    const handleLastPage = () => onPageChange(totalPages);
 
-type PaginationLinkProps = {
-  isActive?: boolean
-} & Pick<React.ComponentProps<typeof Button>, "size"> &
-  React.ComponentProps<"a">
+    const getVisiblePages = () => {
+        const delta = 2;
+        const range = [];
+        const rangeWithDots = [];
 
-function PaginationLink({
-  className,
-  isActive,
-  size = "icon",
-  ...props
-}: PaginationLinkProps) {
-  return (
-    <a
-      aria-current={isActive ? "page" : undefined}
-      data-slot="pagination-link"
-      data-active={isActive}
-      className={cn(
-        buttonVariants({
-          variant: isActive ? "outline" : "ghost",
-          size,
-        }),
-        className
-      )}
-      {...props}
-    />
-  )
-}
+        for (
+            let i = Math.max(2, currentPage - delta);
+            i <= Math.min(totalPages - 1, currentPage + delta);
+            i++
+        ) {
+            range.push(i);
+        }
 
-function PaginationPrevious({
-  className,
-  ...props
-}: React.ComponentProps<typeof PaginationLink>) {
-  return (
-    <PaginationLink
-      aria-label="Go to previous page"
-      size="default"
-      className={cn("gap-1 px-2.5 sm:pl-2.5", className)}
-      {...props}
-    >
-      <ChevronLeftIcon />
-      <span className="hidden sm:block">Previous</span>
-    </PaginationLink>
-  )
-}
+        if (currentPage - delta > 2) {
+            rangeWithDots.push(1, "...");
+        } else {
+            rangeWithDots.push(1);
+        }
 
-function PaginationNext({
-  className,
-  ...props
-}: React.ComponentProps<typeof PaginationLink>) {
-  return (
-    <PaginationLink
-      aria-label="Go to next page"
-      size="default"
-      className={cn("gap-1 px-2.5 sm:pr-2.5", className)}
-      {...props}
-    >
-      <span className="hidden sm:block">Next</span>
-      <ChevronRightIcon />
-    </PaginationLink>
-  )
-}
+        rangeWithDots.push(...range);
 
-function PaginationEllipsis({
-  className,
-  ...props
-}: React.ComponentProps<"span">) {
-  return (
-    <span
-      aria-hidden
-      data-slot="pagination-ellipsis"
-      className={cn("flex size-9 items-center justify-center", className)}
-      {...props}
-    >
-      <MoreHorizontalIcon className="size-4" />
-      <span className="sr-only">More pages</span>
-    </span>
-  )
-}
+        if (currentPage + delta < totalPages - 1) {
+            rangeWithDots.push("...", totalPages);
+        } else if (totalPages > 1) {
+            rangeWithDots.push(totalPages);
+        }
 
-export {
-  Pagination,
-  PaginationContent,
-  PaginationLink,
-  PaginationItem,
-  PaginationPrevious,
-  PaginationNext,
-  PaginationEllipsis,
+        return rangeWithDots;
+    };
+
+    if (totalPages <= 1) {
+        return null;
+    }
+
+    return (
+        <div className={cn("flex items-center justify-between", className)}>
+            <div className="flex items-center space-x-2">
+                {showItemCount && (
+                    <p className="text-sm text-gray-700">
+                        Showing {startItem} to {endItem} of {totalItems} results
+                    </p>
+                )}
+                {showPageSizeSelector && (
+                    <div className="flex items-center space-x-2">
+                        <p className="text-sm text-gray-700">Show:</p>
+                        <Select
+                            value={pageSize.toString()}
+                            onValueChange={(value) =>
+                                onPageSizeChange(Number(value))
+                            }
+                        >
+                            <SelectTrigger className="w-20">
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {pageSizeOptions.map((size) => (
+                                    <SelectItem
+                                        key={size}
+                                        value={size.toString()}
+                                    >
+                                        {size}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                )}
+            </div>
+
+            <div className="flex items-center space-x-1">
+                <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleFirstPage}
+                    disabled={currentPage === 1}
+                    className="h-8 w-8 p-0"
+                >
+                    <ChevronsLeft className="h-4 w-4" />
+                </Button>
+                <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handlePreviousPage}
+                    disabled={currentPage === 1}
+                    className="h-8 w-8 p-0"
+                >
+                    <ChevronLeft className="h-4 w-4" />
+                </Button>
+
+                {getVisiblePages().map((page, index) => (
+                    <div key={index}>
+                        {page === "..." ? (
+                            <span className="px-3 py-1 text-sm text-gray-500">
+                                ...
+                            </span>
+                        ) : (
+                            <Button
+                                variant={
+                                    currentPage === page ? "default" : "outline"
+                                }
+                                size="sm"
+                                onClick={() => onPageChange(page as number)}
+                                className="h-8 w-8 p-0"
+                            >
+                                {page}
+                            </Button>
+                        )}
+                    </div>
+                ))}
+
+                <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleNextPage}
+                    disabled={currentPage === totalPages}
+                    className="h-8 w-8 p-0"
+                >
+                    <ChevronRight className="h-4 w-4" />
+                </Button>
+                <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleLastPage}
+                    disabled={currentPage === totalPages}
+                    className="h-8 w-8 p-0"
+                >
+                    <ChevronsRight className="h-4 w-4" />
+                </Button>
+            </div>
+        </div>
+    );
 }

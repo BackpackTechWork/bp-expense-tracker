@@ -18,10 +18,6 @@ export default async function DashboardLayout({
         redirect("/auth/signin");
     }
 
-    if (session.user.role === "ADMIN") {
-        redirect("/admin");
-    }
-
     return (
         <div className="min-h-screen bg-gradient-to-br from-[#FDEBD0] to-[#F7CAC9]">
             <UserNavigation />
