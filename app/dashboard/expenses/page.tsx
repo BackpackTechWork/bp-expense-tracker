@@ -1,10 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import {
-    useGroupedExpenses,
-    type GroupedExpenseFilters,
-} from "@/hooks/use-grouped-expenses";
+import { type GroupedExpenseFilters } from "@/hooks/use-grouped-expenses";
 import { useCategories } from "@/hooks/use-categories";
 import { GroupedExpensesView } from "@/components/user/grouped-expenses-view";
 import { Loader } from "@/components/ui/loader";
@@ -14,12 +11,10 @@ export default function ExpensesPage() {
         groupBy: "day",
     });
 
-    const { data: groupedExpenses, isLoading: isLoadingExpenses } =
-        useGroupedExpenses(filters);
     const { data: categories, isLoading: isLoadingCategories } =
         useCategories();
 
-    if (isLoadingExpenses || isLoadingCategories) {
+    if (isLoadingCategories) {
         return (
             <div className="flex items-center justify-center min-h-[400px]">
                 <Loader />
@@ -41,7 +36,6 @@ export default function ExpensesPage() {
                     </div>
 
                     <GroupedExpensesView
-                        data={groupedExpenses}
                         categories={categories || []}
                         filters={filters}
                         onFiltersChange={setFilters}

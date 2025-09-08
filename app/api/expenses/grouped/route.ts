@@ -12,6 +12,8 @@ const groupedExpensesSchema = z.object({
     startDate: z.string().datetime().optional(),
     endDate: z.string().datetime().optional(),
     categoryId: z.string().optional(),
+    limit: z.coerce.number().min(1).max(50).default(10),
+    offset: z.coerce.number().min(0).default(0),
 });
 
 type GroupedExpensesParams = z.infer<typeof groupedExpensesSchema>;
@@ -120,6 +122,8 @@ export async function GET(request: NextRequest) {
             startDate: searchParams.get("startDate") || undefined,
             endDate: searchParams.get("endDate") || undefined,
             categoryId: searchParams.get("categoryId") || undefined,
+            limit: searchParams.get("limit") || "10",
+            offset: searchParams.get("offset") || "0",
         });
 
         const where = buildExpenseWhereClause(userId, {
@@ -198,12 +202,19 @@ export async function GET(request: NextRequest) {
         });
 
         // Convert to array and sort by period (newest first)
-        const result = Array.from(groupedExpenses.values()).sort((a, b) => {
+        const allGroups = Array.from(groupedExpenses.values()).sort((a, b) => {
             return new Date(b.period).getTime() - new Date(a.period).getTime();
         });
 
-        // Calculate total amount across all groups
-        const totalAmount = result.reduce(
+        // Apply pagination
+        const paginatedGroups = allGroups.slice(
+            params.offset,
+            params.offset + params.limit
+        );
+        const hasMore = params.offset + params.limit < allGroups.length;
+
+        // Calculate total amount across all groups (not just paginated ones)
+        const totalAmount = allGroups.reduce(
             (sum, group) => sum + group.totalAmount,
             0
         );
@@ -211,14 +222,21 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({
             success: true,
             data: {
-                groups: result,
+                groups: paginatedGroups,
                 totalAmount,
                 totalExpenses: expenses.length,
+                totalGroups: allGroups.length,
+                hasMore,
                 groupBy: params.groupBy,
                 filters: {
                     startDate: params.startDate,
                     endDate: params.endDate,
                     categoryId: params.categoryId,
+                },
+                pagination: {
+                    limit: params.limit,
+                    offset: params.offset,
+                    hasMore,
                 },
             },
         });

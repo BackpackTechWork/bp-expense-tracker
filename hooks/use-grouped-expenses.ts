@@ -1,11 +1,11 @@
-import { useQuery } from "@tanstack/react-query";
-import { queryKeys } from "@/lib/query-keys";
+import { useQuery, useInfiniteQuery } from "@tanstack/react-query";
 
 interface GroupedExpenseFilters {
     groupBy?: "day" | "week" | "month";
     startDate?: string;
     endDate?: string;
     categoryId?: string;
+    limit?: number;
 }
 
 interface GroupedExpense {
@@ -32,16 +32,24 @@ interface GroupedExpensesResponse {
     groups: GroupedExpense[];
     totalAmount: number;
     totalExpenses: number;
+    totalGroups: number;
+    hasMore: boolean;
     groupBy: "day" | "week" | "month";
     filters: {
         startDate?: string;
         endDate?: string;
         categoryId?: string;
     };
+    pagination: {
+        limit: number;
+        offset: number;
+        hasMore: boolean;
+    };
 }
 
 async function fetchGroupedExpenses(
-    filters: GroupedExpenseFilters = {}
+    filters: GroupedExpenseFilters = {},
+    pageParam: number = 0
 ): Promise<GroupedExpensesResponse> {
     const searchParams = new URLSearchParams();
 
@@ -49,6 +57,12 @@ async function fetchGroupedExpenses(
     if (filters.startDate) searchParams.set("startDate", filters.startDate);
     if (filters.endDate) searchParams.set("endDate", filters.endDate);
     if (filters.categoryId) searchParams.set("categoryId", filters.categoryId);
+
+    const limit = filters.limit || 10;
+    const offset = pageParam * limit;
+
+    searchParams.set("limit", limit.toString());
+    searchParams.set("offset", offset.toString());
 
     const response = await fetch(
         `/api/expenses/grouped?${searchParams.toString()}`
@@ -71,6 +85,24 @@ export function useGroupedExpenses(filters: GroupedExpenseFilters = {}) {
     return useQuery({
         queryKey: ["grouped-expenses", filters],
         queryFn: () => fetchGroupedExpenses(filters),
+        staleTime: 2 * 60 * 1000, // 2 minutes
+    });
+}
+
+export function useInfiniteGroupedExpenses(
+    filters: GroupedExpenseFilters = {}
+) {
+    return useInfiniteQuery({
+        queryKey: ["grouped-expenses-infinite", filters],
+        queryFn: ({ pageParam = 0 }) =>
+            fetchGroupedExpenses(filters, pageParam),
+        getNextPageParam: (lastPage, allPages) => {
+            if (!lastPage.pagination.hasMore) {
+                return undefined;
+            }
+            return allPages.length;
+        },
+        initialPageParam: 0,
         staleTime: 2 * 60 * 1000, // 2 minutes
     });
 }

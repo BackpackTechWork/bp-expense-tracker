@@ -1,5 +1,6 @@
 import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
+import { faker } from "@faker-js/faker";
 
 const prisma = new PrismaClient();
 
@@ -47,10 +48,67 @@ async function main() {
     }
     console.log(`✅ Created ${createdCategories} expense categories`);
 
+    const allCategories = await prisma.category.findMany();
+    const expenses = [];
+
+    for (let i = 0; i < 100; i++) {
+        const randomCategory = faker.helpers.arrayElement(allCategories);
+        const expenseDate = faker.date.between({
+            from: new Date("2024-01-01"),
+            to: new Date(),
+        });
+
+        const expense = {
+            amount: parseFloat(
+                faker.finance.amount({ min: 5, max: 500, dec: 2 })
+            ),
+            description: faker.helpers.arrayElement([
+                faker.commerce.productName(),
+                faker.company.buzzPhrase(),
+                faker.lorem.words(3),
+                faker.finance.transactionDescription(),
+                faker.commerce.department() + " purchase",
+                faker.helpers.arrayElement([
+                    "Coffee",
+                    "Lunch",
+                    "Dinner",
+                    "Gas",
+                    "Groceries",
+                    "Movie ticket",
+                    "Book",
+                    "Subscription",
+                    "Repair",
+                    "Gift",
+                ]),
+            ]),
+            note: faker.helpers.maybe(() => faker.lorem.sentence(), {
+                probability: 0.3,
+            }),
+            date: expenseDate,
+            userId: adminUser.id,
+            categoryId: randomCategory.id,
+        };
+
+        expenses.push(expense);
+    }
+
+    const batchSize = 20;
+    let createdExpenses = 0;
+
+    for (let i = 0; i < expenses.length; i += batchSize) {
+        const batch = expenses.slice(i, i + batchSize);
+        await prisma.expense.createMany({
+            data: batch,
+            skipDuplicates: true,
+        });
+        createdExpenses += batch.length;
+    }
+
     console.log("🎉 Database seeded successfully!");
     console.log("\n📋 Summary:");
     console.log(`   • Admin user: ${adminUser.email} (password: admin123)`);
     console.log(`   • Categories: ${createdCategories} expense categories`);
+    console.log(`   • Expenses: ${createdExpenses} fake expenses`);
     console.log("\n🚀 You can now start the application with: pnpm run dev");
 }
 

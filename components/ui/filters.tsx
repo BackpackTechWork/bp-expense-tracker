@@ -149,7 +149,7 @@ export function FilterBar({
                     <span>Active filters:</span>
                     {searchValue && (
                         <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded">
-                            Search: "{searchValue}"
+                            Search: &quot;{searchValue}&quot;
                         </span>
                     )}
                     {filters.map((filter) => {
