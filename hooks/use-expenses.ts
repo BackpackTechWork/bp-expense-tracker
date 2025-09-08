@@ -31,7 +31,6 @@ async function apiRequest(url: string, options?: RequestInit) {
     return data.data;
 }
 
-// Build query parameters
 function buildSearchParams(params: ExpensesParams): URLSearchParams {
     const searchParams = new URLSearchParams();
 
@@ -51,7 +50,6 @@ function buildSearchParams(params: ExpensesParams): URLSearchParams {
     return searchParams;
 }
 
-// Fetch expenses
 async function fetchExpenses(params: ExpensesParams = {}) {
     const searchParams = buildSearchParams(params);
     return apiRequest(`/api/expenses?${searchParams.toString()}`);
@@ -65,7 +63,6 @@ export function useExpenses(params: ExpensesParams = {}) {
     });
 }
 
-// Fetch recent expenses
 export function useRecentExpenses(limit: number = 5) {
     return useQuery({
         queryKey: queryKeys.expenses.list({ limit }),
@@ -74,7 +71,6 @@ export function useRecentExpenses(limit: number = 5) {
     });
 }
 
-// Fetch expenses for a specific user (admin use)
 export function useUserExpenses(userId: string, limit: number = 10) {
     return useQuery({
         queryKey: queryKeys.expenses.list({ userId, limit }),
@@ -84,7 +80,6 @@ export function useUserExpenses(userId: string, limit: number = 10) {
     });
 }
 
-// Generic mutation functions
 async function createExpense(formData: FormData) {
     return apiRequest("/api/expenses", {
         method: "POST",
@@ -92,10 +87,13 @@ async function createExpense(formData: FormData) {
     });
 }
 
-async function updateExpense({ id, data }: { id: string; data: FormData }) {
+async function updateExpense({ id, data }: { id: string; data: any }) {
     return apiRequest(`/api/expenses/${id}`, {
-        method: "PATCH",
-        body: data,
+        method: "PUT",
+        headers: {
+            "Content-Type": "application/json",
+        },
+        body: JSON.stringify(data),
     });
 }
 
@@ -105,10 +103,26 @@ async function deleteExpense(id: string) {
     });
 }
 
-// Generic query invalidation function
 function invalidateExpenseQueries(queryClient: any, expenseId?: string) {
     queryClient.invalidateQueries({ queryKey: queryKeys.expenses.all });
+    queryClient.invalidateQueries({ queryKey: queryKeys.expenses.lists() });
+
+    queryClient.invalidateQueries({ queryKey: ["grouped-expenses"] });
+    queryClient.invalidateQueries({ queryKey: ["grouped-expenses-infinite"] });
+
     queryClient.invalidateQueries({ queryKey: queryKeys.analytics.all });
+    queryClient.invalidateQueries({ queryKey: queryKeys.analytics.overview() });
+    queryClient.invalidateQueries({
+        queryKey: queryKeys.analytics.spendingTrends(),
+    });
+    queryClient.invalidateQueries({
+        queryKey: queryKeys.analytics.categoryBreakdown(),
+    });
+
+    queryClient.invalidateQueries({ queryKey: queryKeys.budgets.all });
+    queryClient.invalidateQueries({ queryKey: queryKeys.budgets.lists() });
+
+    queryClient.invalidateQueries({ queryKey: queryKeys.reports.all });
 
     if (expenseId) {
         queryClient.removeQueries({
@@ -117,7 +131,6 @@ function invalidateExpenseQueries(queryClient: any, expenseId?: string) {
     }
 }
 
-// Hooks
 export function useCreateExpense() {
     const queryClient = useQueryClient();
     return useMutation({

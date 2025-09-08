@@ -1,111 +1,42 @@
-import { auth } from "@/auth";
-import { prisma } from "@/lib/prisma";
+"use client";
+
 import { AnalyticsOverview } from "@/components/user/analytics-overview";
 import { ExpenseCharts } from "@/components/user/expense-charts";
 import { CategoryBreakdown } from "@/components/user/category-breakdown";
 import { SpendingTrends } from "@/components/user/spending-trends";
+import { useAnalyticsData } from "@/hooks/use-analytics";
+import { Loader } from "@/components/ui/loader";
 
-export default async function AnalyticsPage() {
-    const session = await auth();
-    const userId = session!.user.id;
+export default function AnalyticsPage() {
+    const { data, isLoading, error } = useAnalyticsData();
 
-    // Get current month data
-    const now = new Date();
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    if (isLoading) {
+        return (
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+                <div className="flex items-center justify-center h-64">
+                    <Loader />
+                </div>
+            </div>
+        );
+    }
 
-    // Get last month for comparison
-    const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-    const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0);
+    if (error || !data) {
+        return (
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+                <div className="text-center">
+                    <h2 className="text-xl font-semibold text-red-600">
+                        Error loading analytics
+                    </h2>
+                    <p className="text-gray-600 mt-2">
+                        {error?.message || "Failed to load analytics data"}
+                    </p>
+                </div>
+            </div>
+        );
+    }
 
-    const [
-        currentMonthExpenses,
-        lastMonthExpenses,
-        categoryData,
-        last6MonthsData,
-        dailyData,
-    ] = await Promise.all([
-        // Current month expenses
-        prisma.expense.findMany({
-            where: {
-                userId,
-                date: { gte: startOfMonth, lte: endOfMonth },
-            },
-            include: { category: true },
-        }),
-
-        // Last month expenses
-        prisma.expense.findMany({
-            where: {
-                userId,
-                date: { gte: startOfLastMonth, lte: endOfLastMonth },
-            },
-        }),
-
-        // Category breakdown (last 3 months)
-        prisma.expense.groupBy({
-            by: ["categoryId"],
-            where: {
-                userId,
-                date: {
-                    gte: new Date(now.getFullYear(), now.getMonth() - 2, 1),
-                },
-            },
-            _sum: { amount: true },
-            _count: true,
-        }),
-
-        // Last 6 months data
-        prisma.expense.findMany({
-            where: {
-                userId,
-                date: {
-                    gte: new Date(now.getFullYear(), now.getMonth() - 5, 1),
-                },
-            },
-            include: { category: true },
-        }),
-
-        // Daily data for current month
-        prisma.expense.findMany({
-            where: {
-                userId,
-                date: { gte: startOfMonth, lte: endOfMonth },
-            },
-            include: { category: true },
-            orderBy: { date: "asc" },
-        }),
-    ]);
-
-    // Get category details for the breakdown
-    const categoryIds = categoryData.map((item) => item.categoryId);
-    const categories = await prisma.category.findMany({
-        where: { id: { in: categoryIds } },
-    });
-
-    const currentMonthTotal = currentMonthExpenses.reduce(
-        (sum, expense) => sum + expense.amount,
-        0
-    );
-    const lastMonthTotal = lastMonthExpenses.reduce(
-        (sum, expense) => sum + expense.amount,
-        0
-    );
-    const monthlyChange =
-        lastMonthTotal > 0
-            ? ((currentMonthTotal - lastMonthTotal) / lastMonthTotal) * 100
-            : 0;
-
-    const stats = {
-        currentMonthTotal,
-        lastMonthTotal,
-        monthlyChange,
-        totalTransactions: currentMonthExpenses.length,
-        averageTransaction:
-            currentMonthExpenses.length > 0
-                ? currentMonthTotal / currentMonthExpenses.length
-                : 0,
-    };
+    const { stats, categoryData, categories, last6MonthsData, dailyData } =
+        data;
 
     return (
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">

@@ -10,20 +10,22 @@ import {
 
 export async function PUT(
     request: NextRequest,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     try {
         const { userId } = await authenticateRequest(request);
         const body = await request.json();
+        const { id } = await params;
+
         const validatedData = expenseUpdateSchema.parse({
             ...body,
-            id: params.id,
+            id,
         });
 
-        await findExpenseById(params.id, userId);
+        await findExpenseById(id, userId);
 
         const expense = await prisma.expense.update({
-            where: { id: params.id },
+            where: { id },
             data: { ...validatedData, id: undefined },
             include: { category: true },
         });
@@ -42,14 +44,15 @@ export async function PUT(
 
 export async function DELETE(
     request: NextRequest,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     try {
         const { userId } = await authenticateRequest(request);
+        const { id } = await params;
 
-        const existingExpense = await findExpenseById(params.id, userId);
+        const existingExpense = await findExpenseById(id, userId);
 
-        await prisma.expense.delete({ where: { id: params.id } });
+        await prisma.expense.delete({ where: { id } });
 
         await logExpenseActivity(
             userId,

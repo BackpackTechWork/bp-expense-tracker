@@ -16,7 +16,14 @@ export const expenseSchema = z.object({
         .optional()
         .nullable(),
     categoryId: z.string().min(1, "Category is required"),
-    date: z.date().min(new Date("1900-01-01"), "Date must be valid"),
+    date: z
+        .union([z.date(), z.string().transform((str) => new Date(str))])
+        .refine((date) => date instanceof Date && !isNaN(date.getTime()), {
+            message: "Invalid date format",
+        })
+        .refine((date) => date >= new Date("1900-01-01"), {
+            message: "Date must be after 1900",
+        }),
     receiptUrl: z.string().url().optional().or(z.literal("")),
 });
 

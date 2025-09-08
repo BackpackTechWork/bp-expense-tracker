@@ -121,3 +121,27 @@ export function useCategoryBreakdown(params: CategoryBreakdownParams = {}) {
         staleTime: 5 * 60 * 1000, // 5 minutes
     });
 }
+
+async function fetchAnalyticsData() {
+    const response = await fetch("/api/analytics");
+
+    if (!response.ok) {
+        throw new Error("Failed to fetch analytics data");
+    }
+
+    const data = await response.json();
+
+    if (!data.success) {
+        throw new Error(data.message || "Failed to fetch analytics data");
+    }
+
+    return data.data;
+}
+
+export function useAnalyticsData() {
+    return useQuery({
+        queryKey: [...queryKeys.analytics.overview(), "complete"],
+        queryFn: fetchAnalyticsData,
+        staleTime: 5 * 60 * 1000, // 5 minutes
+    });
+}

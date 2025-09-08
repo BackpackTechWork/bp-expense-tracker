@@ -22,15 +22,10 @@ import {
     TableHeader,
     TableRow,
 } from "@/components/ui/table";
-import {
-    Search,
-    Filter,
-    ChevronLeft,
-    ChevronRight,
-    Edit,
-    Trash2,
-} from "lucide-react";
+import { Search, Filter, ChevronLeft, ChevronRight, Edit } from "lucide-react";
+import { ExpenseDetailModal } from "./expense-detail-modal";
 import { format } from "date-fns";
+import { formatCurrency } from "@/lib/currency-utils";
 
 interface Expense {
     id: string;
@@ -85,6 +80,9 @@ export function ExpenseList({
     );
     const [startDate, setStartDate] = useState(searchParams.startDate || "");
     const [endDate, setEndDate] = useState(searchParams.endDate || "");
+    const [selectedExpense, setSelectedExpense] = useState<Expense | null>(
+        null
+    );
 
     const handleFilter = () => {
         const params = new URLSearchParams();
@@ -210,7 +208,7 @@ export function ExpenseList({
                             Expenses ({pagination.total})
                             {totalAmount > 0 && (
                                 <span className="ml-2 text-lg font-normal text-gray-600">
-                                    Total: {totalAmount.toFixed(2)}
+                                    Total: {formatCurrency(totalAmount)}
                                 </span>
                             )}
                         </CardTitle>
@@ -288,21 +286,22 @@ export function ExpenseList({
                                                     </Badge>
                                                 </TableCell>
                                                 <TableCell className="text-right font-medium">
-                                                    {expense.amount.toFixed(2)}
+                                                    {formatCurrency(
+                                                        expense.amount
+                                                    )}
                                                 </TableCell>
                                                 <TableCell>
                                                     <div className="flex items-center space-x-2">
                                                         <Button
                                                             variant="outline"
                                                             size="sm"
+                                                            onClick={() =>
+                                                                setSelectedExpense(
+                                                                    expense
+                                                                )
+                                                            }
                                                         >
                                                             <Edit className="h-4 w-4" />
-                                                        </Button>
-                                                        <Button
-                                                            variant="outline"
-                                                            size="sm"
-                                                        >
-                                                            <Trash2 className="h-4 w-4" />
                                                         </Button>
                                                     </div>
                                                 </TableCell>
@@ -368,6 +367,12 @@ export function ExpenseList({
                     )}
                 </CardContent>
             </Card>
+
+            <ExpenseDetailModal
+                expense={selectedExpense}
+                isOpen={!!selectedExpense}
+                onOpenChange={(open) => !open && setSelectedExpense(null)}
+            />
         </div>
     );
 }
