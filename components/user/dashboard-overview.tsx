@@ -76,7 +76,7 @@ export function DashboardOverview({
     const overviewCards = [
         {
             title: getPeriodTitle(),
-            value: `$${stats.periodTotal.toFixed(2)}`,
+            value: `${stats.periodTotal.toFixed(2)}`,
             icon: DollarSign,
             color: "text-[#DC143C]",
             bgColor: "bg-[#FDEBD0]",
@@ -90,7 +90,7 @@ export function DashboardOverview({
         },
         {
             title: "All Time Total",
-            value: `$${stats.totalAmount.toFixed(2)}`,
+            value: `${stats.totalAmount.toFixed(2)}`,
             icon: TrendingUp,
             color: "text-green-600",
             bgColor: "bg-green-50",

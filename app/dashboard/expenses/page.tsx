@@ -1,96 +1,53 @@
-import { auth } from "@/auth";
-import { prisma } from "@/lib/prisma";
-import { ExpenseList } from "@/components/user/expense-list";
+"use client";
 
-interface SearchParams {
-    page?: string;
-    category?: string;
-    startDate?: string;
-    endDate?: string;
-    search?: string;
-}
+import { useState } from "react";
+import {
+    useGroupedExpenses,
+    type GroupedExpenseFilters,
+} from "@/hooks/use-grouped-expenses";
+import { useCategories } from "@/hooks/use-categories";
+import { GroupedExpensesView } from "@/components/user/grouped-expenses-view";
+import { Loader } from "@/components/ui/loader";
 
-interface ExpenseListPageProps {
-    searchParams: SearchParams;
-}
+export default function ExpensesPage() {
+    const [filters, setFilters] = useState<GroupedExpenseFilters>({
+        groupBy: "day",
+    });
 
-export default async function ExpenseListPage({
-    searchParams,
-}: ExpenseListPageProps) {
-    const session = await auth();
-    const userId = session!.user.id;
+    const { data: groupedExpenses, isLoading: isLoadingExpenses } =
+        useGroupedExpenses(filters);
+    const { data: categories, isLoading: isLoadingCategories } =
+        useCategories();
 
-    const page = Number.parseInt(searchParams.page || "1");
-    const limit = 10;
-    const categoryId = searchParams.category;
-    const startDate = searchParams.startDate;
-    const endDate = searchParams.endDate;
-    const search = searchParams.search;
-
-    const where: any = {
-        userId,
-    };
-
-    if (categoryId) {
-        where.categoryId = categoryId;
+    if (isLoadingExpenses || isLoadingCategories) {
+        return (
+            <div className="flex items-center justify-center min-h-[400px]">
+                <Loader />
+            </div>
+        );
     }
-
-    if (startDate && endDate) {
-        where.date = {
-            gte: new Date(startDate),
-            lte: new Date(endDate),
-        };
-    }
-
-    if (search) {
-        where.OR = [
-            { description: { contains: search, mode: "insensitive" } },
-            { note: { contains: search, mode: "insensitive" } },
-        ];
-    }
-
-    const [expenses, total, categories] = await Promise.all([
-        prisma.expense.findMany({
-            where,
-            include: {
-                category: true,
-            },
-            orderBy: { date: "desc" },
-            skip: (page - 1) * limit,
-            take: limit,
-        }),
-        prisma.expense.count({ where }),
-        prisma.category.findMany({
-            orderBy: { name: "asc" },
-        }),
-    ]);
-
-    const pagination = {
-        page,
-        limit,
-        total,
-        pages: Math.ceil(total / limit),
-    };
 
     return (
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
-            <div className="flex items-center justify-between">
-                <div>
-                    <h1 className="text-3xl font-bold text-gray-900">
-                        All Expenses
-                    </h1>
-                    <p className="text-gray-600">
-                        Manage and filter your expenses
-                    </p>
+        <div className="min-h-screen bg-gray-50">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 pb-20 md:pb-6">
+                <div className="space-y-6">
+                    <div className="flex flex-col space-y-2">
+                        <h1 className="text-3xl font-bold text-gray-900">
+                            Expenses Overview
+                        </h1>
+                        <p className="text-gray-600 text-lg">
+                            View your expenses grouped by day, week, or month
+                        </p>
+                    </div>
+
+                    <GroupedExpensesView
+                        data={groupedExpenses}
+                        categories={categories || []}
+                        filters={filters}
+                        onFiltersChange={setFilters}
+                    />
                 </div>
             </div>
-
-            <ExpenseList
-                expenses={expenses}
-                categories={categories}
-                pagination={pagination}
-                searchParams={searchParams}
-            />
         </div>
     );
 }

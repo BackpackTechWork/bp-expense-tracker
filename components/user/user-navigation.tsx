@@ -22,13 +22,34 @@ import {
     Settings,
     LogOut,
     Shield,
+    List,
 } from "lucide-react";
 
 const navigation = [
-    { name: "Dashboard", href: "/dashboard", icon: Home },
-    { name: "Add Expense", href: "/dashboard/add", icon: Plus },
-    { name: "Analytics", href: "/dashboard/analytics", icon: BarChart3 },
-    { name: "Goals", href: "/dashboard/goals", icon: Target },
+    {
+        name: "Dashboard",
+        href: "/dashboard",
+        icon: Home,
+        shortName: "Dashboard",
+    },
+    {
+        name: "Expenses",
+        href: "/dashboard/expenses",
+        icon: List,
+        shortName: "Expenses",
+    },
+    {
+        name: "Analytics",
+        href: "/dashboard/analytics",
+        icon: BarChart3,
+        shortName: "Analytic",
+    },
+    {
+        name: "Goals",
+        href: "/dashboard/goals",
+        icon: Target,
+        shortName: "Goal",
+    },
 ];
 
 export function UserNavigation() {
@@ -42,14 +63,14 @@ export function UserNavigation() {
             <header className="hidden md:block bg-white/90 backdrop-blur-sm border-b border-white/20 sticky top-0 z-40">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                     <div className="flex justify-between items-center h-16">
-                        <div className="flex items-center space-x-8">
+                        <div className="flex items-center space-x-6">
                             <Link
                                 href="/dashboard"
-                                className="text-2xl font-bold text-[#DC143C]"
+                                className="text-xl font-bold text-[#DC143C] whitespace-nowrap"
                             >
                                 ExpenseTracker
                             </Link>
-                            <nav className="flex space-x-6">
+                            <nav className="flex space-x-1">
                                 {navigation.map((item) => {
                                     const isActive = pathname === item.href;
                                     return (
@@ -57,13 +78,13 @@ export function UserNavigation() {
                                             key={item.name}
                                             href={item.href}
                                             className={cn(
-                                                "flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors",
+                                                "flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors whitespace-nowrap",
                                                 isActive
                                                     ? "bg-[#DC143C] text-white"
                                                     : "text-gray-700 hover:bg-[#F7CAC9] hover:text-[#DC143C]"
                                             )}
                                         >
-                                            <item.icon className="mr-2 h-4 w-4" />
+                                            <item.icon className="mr-1.5 h-4 w-4" />
                                             {item.name}
                                         </Link>
                                     );
@@ -112,7 +133,7 @@ export function UserNavigation() {
                                     </div>
                                 </div>
                                 <DropdownMenuSeparator />
-                                {session?.user?.role === "ADMIN" && (
+                                {(session?.user as any)?.role === "ADMIN" && (
                                     <DropdownMenuItem asChild>
                                         <Link href="/admin">
                                             <Shield className="mr-2 h-4 w-4" />
@@ -142,9 +163,9 @@ export function UserNavigation() {
             </header>
 
             {/* Mobile Bottom Navigation */}
-            <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-50">
+            <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-50 shadow-lg">
                 <div className="grid grid-cols-4 h-16">
-                    {navigation.map((item) => {
+                    {navigation.map((item, index) => {
                         const isActive = pathname === item.href;
                         return (
                             <Link
@@ -158,19 +179,27 @@ export function UserNavigation() {
                                 )}
                             >
                                 <item.icon className="h-5 w-5" />
-                                <span>{item.name}</span>
+                                <span>{item.shortName}</span>
                             </Link>
                         );
                     })}
                 </div>
+
+                {/* Floating Add Button */}
+                <Link
+                    href="/dashboard/add"
+                    className="absolute top-0 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-[#DC143C] hover:bg-[#B91C1C] text-white rounded-full p-3 shadow-lg transition-colors z-10"
+                >
+                    <Plus className="h-6 w-6" />
+                </Link>
             </nav>
 
             {/* Mobile Header */}
             <header className="md:hidden bg-white/90 backdrop-blur-sm border-b border-white/20 sticky top-0 z-40">
-                <div className="flex justify-between items-center h-16 px-4">
+                <div className="flex justify-between items-center h-14 px-4">
                     <Link
                         href="/dashboard"
-                        className="text-xl font-bold text-[#DC143C]"
+                        className="text-lg font-bold text-[#DC143C]"
                     >
                         ExpenseTracker
                     </Link>
@@ -213,7 +242,7 @@ export function UserNavigation() {
                                 </div>
                             </div>
                             <DropdownMenuSeparator />
-                            {session?.user?.role === "ADMIN" && (
+                            {(session?.user as any)?.role === "ADMIN" && (
                                 <DropdownMenuItem asChild>
                                     <Link href="/admin">
                                         <Shield className="mr-2 h-4 w-4" />

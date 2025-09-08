@@ -107,8 +107,7 @@ export function BudgetProgress({}: BudgetProgressProps) {
                                                     : "text-gray-600"
                                             }`}
                                         >
-                                            ${spent.toFixed(2)} / $
-                                            {budget.amount.toFixed(2)}
+                                            {spent.toFixed(2)} / {budget.amount.toFixed(2)}
                                         </span>
                                     </div>
                                     <Progress
@@ -124,7 +123,6 @@ export function BudgetProgress({}: BudgetProgressProps) {
                                             {percentage.toFixed(1)}% used
                                         </span>
                                         <span>
-                                            $
                                             {(budget.amount - spent).toFixed(2)}{" "}
                                             remaining
                                         </span>

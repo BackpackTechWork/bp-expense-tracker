@@ -29,11 +29,11 @@ export function Loader({ size = "md", className, text }: LoaderProps) {
                         sizeClasses[size]
                     )}
                 >
-                    <div className="absolute inset-0 rounded-full border-2 border-transparent border-t-blue-600"></div>
+                    <div className="absolute inset-0 rounded-full border-2 border-transparent border-t-[#DC143C]"></div>
                 </div>
             </div>
             {text && (
-                <p className="text-sm text-gray-600 animate-pulse">{text}</p>
+                <p className="text-sm text-[#DC143C] animate-pulse">{text}</p>
             )}
         </div>
     );

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { ExpenseCard } from "@/components/user/expense-card";
 import { Plus, ArrowRight, Loader2 } from "lucide-react";
 import { format } from "date-fns";
 import { useRecentExpenses } from "@/hooks/use-expenses";
@@ -12,12 +13,15 @@ interface Expense {
     id: string;
     amount: number;
     description: string | null;
+    note: string | null;
     date: string | Date;
     category: {
+        id: string;
         name: string;
         color: string;
         icon: string | null;
     };
+    receiptUrl?: string | null;
 }
 
 interface RecentExpensesProps {
@@ -86,51 +90,20 @@ export function RecentExpenses({ limit = 5 }: RecentExpensesProps) {
                         </div>
                     ) : (
                         <>
-                            {expenses.map((expense: Expense) => (
-                                <div
-                                    key={expense.id}
-                                    className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
-                                >
-                                    <div className="flex items-center space-x-3">
-                                        <div className="text-2xl">
-                                            {expense.category.icon || "📦"}
-                                        </div>
-                                        <div>
-                                            <p className="font-medium text-gray-900">
-                                                {expense.description ||
-                                                    "No description"}
-                                            </p>
-                                            <div className="flex items-center space-x-2">
-                                                <Badge
-                                                    style={{
-                                                        backgroundColor:
-                                                            expense.category
-                                                                .color,
-                                                    }}
-                                                    className="text-white text-xs"
-                                                >
-                                                    {expense.category.name}
-                                                </Badge>
-                                                <span className="text-sm text-gray-500">
-                                                    {format(
-                                                        new Date(expense.date),
-                                                        "MMM dd"
-                                                    )}
-                                                </span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div className="text-lg font-semibold text-gray-900">
-                                        ${expense.amount.toFixed(2)}
-                                    </div>
-                                </div>
-                            ))}
+                            <div className="space-y-3">
+                                {expenses.map((expense: Expense) => (
+                                    <ExpenseCard
+                                        key={expense.id}
+                                        expense={expense}
+                                    />
+                                ))}
+                            </div>
                             <Button
                                 variant="outline"
                                 asChild
                                 className="w-full bg-transparent"
                             >
-                                <Link href="/dashboard/expenses">
+                                <Link href="/dashboard/expenses/grouped">
                                     View All Expenses
                                     <ArrowRight className="h-4 w-4 ml-2" />
                                 </Link>
