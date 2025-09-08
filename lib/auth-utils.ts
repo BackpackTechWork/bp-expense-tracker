@@ -11,37 +11,21 @@ export async function ensureSessionUser(session: Session | null) {
         throw new Error("No session found");
     }
 
-    // First try to find user by ID
-    let user = await prisma.user.findUnique({
-        where: { id: session.user.id },
-    });
-
-    // If not found by ID, try to find by email (common issue with session/db mismatch)
-    if (!user && session.user.email) {
-        console.warn("User not found by ID, trying to find by email:", {
-            sessionUserId: session.user.id,
-            sessionUserEmail: session.user.email,
-        });
-
-        user = await prisma.user.findUnique({
-            where: { email: session.user.email },
-        });
-
-        if (user) {
-            console.log("Found user by email, updating session user ID:", {
-                oldId: session.user.id,
-                newId: user.id,
-            });
-            // Update the session user ID to match the database
-            session.user.id = user.id;
-        }
+    if (!session?.user?.email) {
+        throw new Error("No email found in session");
     }
+
+    const user = await prisma.user.findUnique({
+        where: { email: session.user.email as string },
+    });
 
     if (!user) {
         throw new Error(
             `User not found in database. ID: ${session.user.id}, Email: ${session.user.email}`
         );
     }
+
+    session.user.id = user.id;
 
     return user;
 }

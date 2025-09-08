@@ -1,5 +1,4 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import {
     expenseSchema,
@@ -7,45 +6,43 @@ import {
     paginationSchema,
 } from "@/lib/validations";
 import { handleApiError, AppError } from "@/lib/error-handler";
-import { ensureSessionUser } from "@/lib/auth-utils";
+import {
+    authenticateRequest,
+    buildExpenseWhereClause,
+    logExpenseActivity,
+} from "@/lib/expense-utils";
 
 export async function GET(request: NextRequest) {
     try {
-        const session = await auth();
-
-        if (!session) {
-            throw new AppError("Unauthorized", 401, "UNAUTHORIZED");
-        }
-
+        const { session, userId } = await authenticateRequest(request);
         const { searchParams } = new URL(request.url);
 
         const { page, limit } = paginationSchema.parse({
-            page: searchParams.get("page"),
-            limit: searchParams.get("limit"),
+            page: searchParams.get("page") || "1",
+            limit: searchParams.get("limit") || "10",
         });
 
         const categoryId = searchParams.get("categoryId");
         const startDate = searchParams.get("startDate");
         const endDate = searchParams.get("endDate");
+        const targetUserId = searchParams.get("userId");
 
         if (startDate || endDate) {
-            dateRangeSchema.parse({ startDate, endDate });
+            dateRangeSchema.parse({
+                startDate: startDate || undefined,
+                endDate: endDate || undefined,
+            });
         }
 
-        const where: any = {
-            userId: session.user.id,
-        };
-
-        if (categoryId) {
-            where.categoryId = categoryId;
-        }
-
-        if (startDate && endDate) {
-            where.date = {
-                gte: new Date(startDate),
-                lte: new Date(endDate),
-            };
-        }
+        const where = buildExpenseWhereClause(userId, {
+            categoryId,
+            startDate,
+            endDate,
+            targetUserId:
+                targetUserId && session.user.role === "ADMIN"
+                    ? targetUserId
+                    : undefined,
+        });
 
         const [expenses, total] = await Promise.all([
             prisma.expense.findMany({
@@ -61,7 +58,8 @@ export async function GET(request: NextRequest) {
         ]);
 
         return NextResponse.json({
-            expenses,
+            success: true,
+            data: expenses,
             pagination: {
                 page,
                 limit,
@@ -76,12 +74,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
     try {
-        const session = await auth();
-
-        if (!session) {
-            throw new AppError("Unauthorized", 401, "UNAUTHORIZED");
-        }
-
+        const { userId } = await authenticateRequest(request);
         const formData = await request.formData();
 
         const expenseData = {
@@ -89,17 +82,14 @@ export async function POST(request: NextRequest) {
             description: formData.get("description") as string,
             categoryId: formData.get("categoryId") as string,
             date: new Date(formData.get("date") as string),
-            receiptUrl: "", // Will be set after file upload
         };
 
         const validatedData = expenseSchema.parse(expenseData);
-
         const note = formData.get("note") as string;
         const receiptFile = formData.get("receipt") as File | null;
 
+        // Handle receipt upload
         let receiptUrl = null;
-
-        // Handle receipt upload (you would implement actual file upload here)
         if (receiptFile && receiptFile.size > 0) {
             const allowedTypes = [
                 "image/jpeg",
@@ -125,13 +115,8 @@ export async function POST(request: NextRequest) {
                 );
             }
 
-            // For now, we'll just store the filename
-            // In production, you'd upload to a service like Vercel Blob or AWS S3
             receiptUrl = `/uploads/${Date.now()}-${receiptFile.name}`;
         }
-
-        // Ensure session user exists in database
-        const sessionUser = await ensureSessionUser(session);
 
         // Verify category exists
         const category = await prisma.category.findUnique({
@@ -139,12 +124,6 @@ export async function POST(request: NextRequest) {
         });
 
         if (!category) {
-            console.error("Category not found:", {
-                categoryId: validatedData.categoryId,
-                availableCategories: await prisma.category.findMany({
-                    select: { id: true, name: true },
-                }),
-            });
             throw new AppError("Category not found", 404, "CATEGORY_NOT_FOUND");
         }
 
@@ -156,28 +135,21 @@ export async function POST(request: NextRequest) {
                 categoryId: validatedData.categoryId,
                 date: validatedData.date,
                 receiptUrl,
-                userId: session.user.id,
+                userId,
             },
-            include: {
-                category: true,
-            },
+            include: { category: true },
         });
 
-        // Log activity (safe to do since we verified user exists)
-        try {
-            await prisma.activityLog.create({
-                data: {
-                    userId: session.user.id,
-                    action: "EXPENSE_CREATED",
-                    details: `Created expense: ${validatedData.description} - $${validatedData.amount}`,
-                },
-            });
-        } catch (logError) {
-            // Don't fail the main operation if logging fails
-            console.error("Failed to log activity:", logError);
-        }
+        await logExpenseActivity(
+            userId,
+            "EXPENSE_CREATED",
+            `Created expense: ${validatedData.description} - $${validatedData.amount}`
+        );
 
-        return NextResponse.json({ expense }, { status: 201 });
+        return NextResponse.json(
+            { success: true, data: expense },
+            { status: 201 }
+        );
     } catch (error) {
         return handleApiError(error);
     }

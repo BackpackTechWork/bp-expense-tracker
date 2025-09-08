@@ -4,17 +4,12 @@ import { redirect } from "next/navigation";
 import { ExportOptions } from "@/components/user/export-options";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FileText, TrendingUp, Calendar, DollarSign } from "lucide-react";
+import { RecentExpenses } from "@/components/user/recent-expenses";
 
 async function getReportData(userId: string) {
-    const [categories, recentReports, totalExpenses] = await Promise.all([
+    const [categories, totalExpenses] = await Promise.all([
         prisma.category.findMany({
             orderBy: { name: "asc" },
-        }),
-        prisma.expense.findMany({
-            where: { userId },
-            take: 5,
-            orderBy: { createdAt: "desc" },
-            include: { category: true },
         }),
         prisma.expense.aggregate({
             where: { userId },
@@ -23,14 +18,14 @@ async function getReportData(userId: string) {
         }),
     ]);
 
-    return { categories, recentReports, totalExpenses };
+    return { categories, totalExpenses };
 }
 
 export default async function ReportsPage() {
     const session = await auth();
     if (!session?.user?.id) redirect("/auth/signin");
 
-    const { categories, recentReports, totalExpenses } = await getReportData(
+    const { categories, totalExpenses } = await getReportData(
         session.user.id
     );
 
@@ -102,48 +97,8 @@ export default async function ReportsPage() {
                 {/* Export Options */}
                 <ExportOptions categories={categories} />
 
-                {/* Recent Activity */}
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                            <Calendar className="h-5 w-5" />
-                            Recent Expenses
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="space-y-3">
-                            {recentReports.length > 0 ? (
-                                recentReports.map((expense) => (
-                                    <div
-                                        key={expense.id}
-                                        className="flex items-center justify-between p-3 bg-slate-50 rounded-lg"
-                                    >
-                                        <div>
-                                            <p className="font-medium text-slate-900">
-                                                {expense.description}
-                                            </p>
-                                            <p className="text-sm text-slate-600">
-                                                {expense.category.name}
-                                            </p>
-                                        </div>
-                                        <div className="text-right">
-                                            <p className="font-medium text-slate-900">
-                                                ${expense.amount.toFixed(2)}
-                                            </p>
-                                            <p className="text-sm text-slate-600">
-                                                {expense.date.toLocaleDateString()}
-                                            </p>
-                                        </div>
-                                    </div>
-                                ))
-                            ) : (
-                                <p className="text-slate-600 text-center py-4">
-                                    No recent expenses
-                                </p>
-                            )}
-                        </div>
-                    </CardContent>
-                </Card>
+                {/* Recent Expenses */}
+                <RecentExpenses limit={5} />
             </div>
         </div>
     );
