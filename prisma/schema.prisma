@@ -51,12 +51,12 @@ model User {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
-  accounts      Account[]
-  sessions      Session[]
-  expenses      Expense[]
-  budgets       Budget[]
-  savingsGoals  SavingsGoal[]
-  activityLogs  ActivityLog[]
+  accounts     Account[]
+  sessions     Session[]
+  expenses     Expense[]
+  budgets      Budget[]
+  savingsGoals SavingsGoal[]
+  activityLogs ActivityLog[]
 }
 
 model VerificationToken {
@@ -68,14 +68,15 @@ model VerificationToken {
 }
 
 model Category {
-  id        String    @id @default(cuid())
-  name      String    @unique
-  color     String    @default("#DC143C")
+  id        String   @id @default(cuid())
+  name      String   @unique
+  color     String   @default("#DC143C")
   icon      String?
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   expenses Expense[]
+  budgets  Budget[]
 }
 
 model Expense {
@@ -107,7 +108,7 @@ model Budget {
   updatedAt DateTime @updatedAt
 
   userId     String
-  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   categoryId String?
   category   Category? @relation(fields: [categoryId], references: [id])
 
@@ -115,13 +116,13 @@ model Budget {
 }
 
 model SavingsGoal {
-  id          String   @id @default(cuid())
-  name        String
-  targetAmount Float
-  currentAmount Float   @default(0)
-  targetDate  DateTime?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id            String    @id @default(cuid())
+  name          String
+  targetAmount  Float
+  currentAmount Float     @default(0)
+  targetDate    DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
   userId String
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -130,12 +131,12 @@ model SavingsGoal {
 }
 
 model ActivityLog {
-  id        String     @id @default(cuid())
+  id        String   @id @default(cuid())
   action    String
   details   String?
   ipAddress String?
   userAgent String?
-  createdAt DateTime   @default(now())
+  createdAt DateTime @default(now())
 
   userId String
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
