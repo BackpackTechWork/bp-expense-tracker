@@ -25,10 +25,11 @@ import {
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { FieldError } from "@/components/ui/field-error";
 import { ValidationSummary } from "@/components/ui/validation-summary";
-import { Loader2, Upload, X, Plus } from "lucide-react";
+import { Loader2, Plus } from "lucide-react";
 import { useExpenseStore } from "@/lib/store";
 import { expenseSchema, type ExpenseInput } from "@/lib/validations";
 import { cn } from "@/lib/utils";
+import { FileUpload } from "@/components/ui/file-upload";
 
 interface AddExpenseFormProps {
     categories?: any[];
@@ -127,19 +128,8 @@ export function AddExpenseForm({
         });
     };
 
-    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (file) {
-            if (file.size > 5 * 1024 * 1024) {
-                setError("File size must be less than 5MB");
-                return;
-            }
-            setReceiptFile(file);
-        }
-    };
-
-    const removeFile = () => {
-        setReceiptFile(null);
+    const handleFileSelect = (file: File | null) => {
+        setReceiptFile(file);
     };
 
     return (
@@ -351,51 +341,17 @@ export function AddExpenseForm({
                         />
                     </div>
 
-                    <div className="space-y-2">
-                        <Label
-                            htmlFor="receipt"
-                            className="text-sm font-medium"
-                        >
-                            Receipt{" "}
-                            <span className="text-gray-500 text-xs">
-                                (optional)
-                            </span>
-                        </Label>
-                        <div className="flex items-center space-x-4">
-                            <Input
-                                id="receipt"
-                                type="file"
-                                accept="image/*"
-                                onChange={handleFileChange}
-                                className="hidden"
-                            />
-                            <Button
-                                type="button"
-                                variant="outline"
-                                onClick={() =>
-                                    document.getElementById("receipt")?.click()
-                                }
-                            >
-                                <Upload className="h-4 w-4 mr-2" />
-                                Upload Receipt
-                            </Button>
-                            {receiptFile && (
-                                <div className="flex items-center space-x-2 bg-gray-100 px-3 py-2 rounded-lg">
-                                    <span className="text-sm text-gray-700">
-                                        {receiptFile.name}
-                                    </span>
-                                    <Button
-                                        type="button"
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={removeFile}
-                                    >
-                                        <X className="h-4 w-4" />
-                                    </Button>
-                                </div>
-                            )}
-                        </div>
-                    </div>
+                    <FileUpload
+                        onFileSelect={handleFileSelect}
+                        selectedFile={receiptFile}
+                        accept={{
+                            "image/*": [".jpeg", ".jpg", ".png", ".webp"],
+                            "application/pdf": [".pdf"],
+                        }}
+                        maxSize={5 * 1024 * 1024} // 5MB
+                        label="Receipt (Optional)"
+                        description="Upload a receipt image or PDF"
+                    />
 
                     <div className="flex space-x-4">
                         <Button

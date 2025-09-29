@@ -11,6 +11,8 @@ import {
     buildExpenseWhereClause,
     logExpenseActivity,
 } from "@/lib/expense-utils";
+import { fileStorage } from "@/lib/storage";
+import { uploadFile, UPLOAD_CONFIGS } from "@/lib/file-utils";
 
 export async function GET(request: NextRequest) {
     try {
@@ -88,34 +90,24 @@ export async function POST(request: NextRequest) {
         const note = formData.get("note") as string;
         const receiptFile = formData.get("receipt") as File | null;
 
-        // Handle receipt upload
+        // Handle receipt upload using the new storage service
         let receiptUrl = null;
         if (receiptFile && receiptFile.size > 0) {
-            const allowedTypes = [
-                "image/jpeg",
-                "image/png",
-                "image/webp",
-                "application/pdf",
-            ];
-            const maxSize = 5 * 1024 * 1024; // 5MB
+            const uploadResult = await uploadFile(
+                receiptFile,
+                UPLOAD_CONFIGS.receipt,
+                fileStorage
+            );
 
-            if (!allowedTypes.includes(receiptFile.type)) {
+            if (!uploadResult.success) {
                 throw new AppError(
-                    "Invalid file type. Only JPEG, PNG, WebP, and PDF files are allowed.",
+                    uploadResult.error || "File upload failed",
                     400,
-                    "INVALID_FILE_TYPE"
+                    "FILE_UPLOAD_FAILED"
                 );
             }
 
-            if (receiptFile.size > maxSize) {
-                throw new AppError(
-                    "File size too large. Maximum size is 5MB.",
-                    400,
-                    "FILE_TOO_LARGE"
-                );
-            }
-
-            receiptUrl = `/uploads/${Date.now()}-${receiptFile.name}`;
+            receiptUrl = uploadResult.path;
         }
 
         // Verify category exists
