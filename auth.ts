@@ -26,10 +26,6 @@ const logUserActivity = async (userId: string, provider: string) => {
 };
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
-    // Temporarily disable adapter to test OAuth flow
-    // adapter: process.env.DATABASE_URL
-    //     ? (PrismaAdapter(prisma) as any)
-    //     : undefined,
     providers: [
         ...(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET
             ? [
@@ -104,12 +100,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     callbacks: {
         async jwt({ token, user, account }) {
             if (user) {
-                console.log("JWT callback - user data:", {
-                    email: user.email,
-                    name: user.name,
-                });
-
-                // Handle user creation/update for OAuth users
                 if (
                     account?.provider === "google" &&
                     user.email &&
@@ -121,12 +111,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
                         });
 
                         if (existingUser) {
-                            console.log(
-                                "Existing user found in JWT callback:",
-                                existingUser.id
-                            );
                             token.role = existingUser.role;
-                            // Update image if needed
+
                             if (!existingUser.image && user.image) {
                                 await prisma.user.update({
                                     where: { id: existingUser.id },
@@ -134,10 +120,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
                                 });
                             }
                         } else {
-                            console.log(
-                                "Creating new user in JWT callback:",
-                                user.email
-                            );
                             const newUser = await prisma.user.create({
                                 data: {
                                     email: user.email,
@@ -147,29 +129,26 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
                                     emailVerified: new Date(),
                                 },
                             });
-                            console.log(
-                                "New user created in JWT callback:",
-                                newUser.id
-                            );
                             token.role = newUser.role;
                         }
                     } catch (error) {
                         console.error("Error in JWT callback:", error);
-                        token.role = "USER"; // Default role
+                        token.role = "USER";
                     }
                 } else {
                     token.role = user.role || "USER";
                 }
 
-                token.email = user.email;
-                token.name = user.name;
-                token.image = user.image;
+                token.id = user.id;
+                token.email = user.email as string;
+                token.name = user.name as string;
+                token.image = user.image as string;
             }
             return token;
         },
         async session({ session, token }) {
             if (token) {
-                session.user.id = token.sub!;
+                session.user.id = token.id as string;
                 session.user.role = token.role as string;
                 session.user.email = token.email as string;
                 session.user.name = token.name as string;
@@ -178,14 +157,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             return session;
         },
         async signIn({ user, account, profile }) {
-            console.log("SignIn callback called:", {
-                user: { email: user.email, name: user.name },
-                account: { provider: account?.provider },
-                hasDatabase: !!process.env.DATABASE_URL,
-            });
-
-            // For now, allow all sign-ins to test OAuth flow
-            // We'll handle user creation in the JWT callback instead
             return true;
         },
         async redirect({ url, baseUrl }) {

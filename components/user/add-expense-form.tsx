@@ -5,6 +5,8 @@ import type React from "react";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { queryKeys } from "@/lib/query-keys";
 import { useCategories } from "@/hooks/use-categories";
 import { CreateCategoryModal } from "@/components/user/create-category-modal";
@@ -25,38 +27,74 @@ import { FieldError } from "@/components/ui/field-error";
 import { ValidationSummary } from "@/components/ui/validation-summary";
 import { Loader2, Upload, X, Plus } from "lucide-react";
 import { useExpenseStore } from "@/lib/store";
+import { expenseSchema, type ExpenseInput } from "@/lib/validations";
+import { cn } from "@/lib/utils";
 
 interface AddExpenseFormProps {
-    categories?: any[]; // Keep for backward compatibility, but we'll use React Query
+    categories?: any[];
 }
+
+type ExpenseFormData = {
+    amount: number;
+    description: string;
+    note: string;
+    categoryId: string;
+    date: string;
+    receiptUrl: string;
+};
 
 export function AddExpenseForm({
     categories: propCategories,
 }: AddExpenseFormProps) {
-    const [amount, setAmount] = useState("");
-    const [description, setDescription] = useState("");
-    const [note, setNote] = useState("");
-    const [categoryId, setCategoryId] = useState("");
-    const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
     const [receiptFile, setReceiptFile] = useState<File | null>(null);
     const [error, setError] = useState("");
-    const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
     const router = useRouter();
     const queryClient = useQueryClient();
     const addExpense = useExpenseStore((state) => state.addExpense);
 
-    // Use React Query to fetch categories, fallback to props for backward compatibility
+    const form = useForm<ExpenseFormData>({
+        resolver: zodResolver(expenseSchema),
+        defaultValues: {
+            amount: 0,
+            description: "",
+            note: "",
+            categoryId: "",
+            date: new Date().toISOString().split("T")[0],
+            receiptUrl: "",
+        },
+    });
+
     const {
         data: categories = propCategories || [],
         isLoading: categoriesLoading,
     } = useCategories();
 
     const createExpenseMutation = useMutation({
-        mutationFn: async (data: FormData) => {
+        mutationFn: async (data: ExpenseInput & { receipt?: File }) => {
+            const formData = new FormData();
+            formData.append("amount", data.amount.toString());
+            formData.append("categoryId", data.categoryId);
+            formData.append(
+                "date",
+                data.date instanceof Date
+                    ? data.date.toISOString().split("T")[0]
+                    : data.date
+            );
+
+            if (data.description) {
+                formData.append("description", data.description);
+            }
+            if (data.note) {
+                formData.append("note", data.note);
+            }
+            if (data.receipt) {
+                formData.append("receipt", data.receipt);
+            }
+
             const response = await fetch("/api/expenses", {
                 method: "POST",
-                body: data,
+                body: formData,
             });
 
             if (!response.ok) {
@@ -68,6 +106,8 @@ export function AddExpenseForm({
         onSuccess: (data) => {
             addExpense(data.expense);
             queryClient.invalidateQueries({ queryKey: queryKeys.expenses.all });
+            form.reset();
+            setReceiptFile(null);
             router.push("/dashboard");
         },
         onError: (error) => {
@@ -75,80 +115,16 @@ export function AddExpenseForm({
         },
     });
 
-    const validateForm = () => {
-        const errors: Record<string, string> = {};
-        const validationErrors: string[] = [];
-
-        // Required fields validation
-        if (!amount || amount.trim() === "") {
-            errors.amount = "Amount is required";
-            validationErrors.push("Amount is required");
-        } else if (isNaN(Number(amount)) || Number(amount) <= 0) {
-            errors.amount = "Amount must be a positive number";
-            validationErrors.push("Amount must be a positive number");
-        }
-
-        if (!categoryId || categoryId.trim() === "") {
-            errors.categoryId = "Category is required";
-            validationErrors.push("Category is required");
-        }
-
-        if (!date || date.trim() === "") {
-            errors.date = "Date is required";
-            validationErrors.push("Date is required");
-        } else {
-            const selectedDate = new Date(date);
-            const minDate = new Date("1900-01-01");
-            if (isNaN(selectedDate.getTime()) || selectedDate < minDate) {
-                errors.date = "Please select a valid date";
-                validationErrors.push("Please select a valid date");
-            }
-        }
-
-        // Optional field validation
-        if (description && description.length > 200) {
-            errors.description = "Description must be less than 200 characters";
-            validationErrors.push(
-                "Description must be less than 200 characters"
-            );
-        }
-
-        if (note && note.length > 500) {
-            errors.note = "Note must be less than 500 characters";
-            validationErrors.push("Note must be less than 500 characters");
-        }
-
-        setFieldErrors(errors);
-        return validationErrors;
-    };
-
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
+    const onSubmit = (data: ExpenseFormData) => {
         setError("");
-        setFieldErrors({});
-
-        const validationErrors = validateForm();
-
-        if (validationErrors.length > 0) {
-            return;
-        }
-
-        const formData = new FormData();
-        formData.append("amount", amount);
-        if (description.trim()) {
-            formData.append("description", description);
-        }
-        if (note.trim()) {
-            formData.append("note", note);
-        }
-        formData.append("categoryId", categoryId);
-        formData.append("date", date);
-
-        if (receiptFile) {
-            formData.append("receipt", receiptFile);
-        }
-
-        createExpenseMutation.mutate(formData);
+        const expenseData: ExpenseInput = {
+            ...data,
+            date: new Date(data.date),
+        };
+        createExpenseMutation.mutate({
+            ...expenseData,
+            receipt: receiptFile || undefined,
+        });
     };
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -189,9 +165,16 @@ export function AddExpenseForm({
                     </Alert>
                 )}
 
-                <ValidationSummary errors={Object.values(fieldErrors)} />
+                <ValidationSummary
+                    errors={Object.values(form.formState.errors).map(
+                        (error) => error?.message || ""
+                    )}
+                />
 
-                <form onSubmit={handleSubmit} className="space-y-6">
+                <form
+                    onSubmit={form.handleSubmit(onSubmit)}
+                    className="space-y-6"
+                >
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="space-y-2">
                             <Label
@@ -205,15 +188,20 @@ export function AddExpenseForm({
                                 type="number"
                                 step="0.01"
                                 placeholder="0.00"
-                                value={amount}
-                                onChange={(e) => setAmount(e.target.value)}
+                                {...form.register("amount", {
+                                    valueAsNumber: true,
+                                })}
                                 className={
-                                    fieldErrors.amount
+                                    form.formState.errors.amount
                                         ? "border-red-500 focus:border-red-500"
                                         : ""
                                 }
                             />
-                            <FieldError message={fieldErrors.amount} />
+                            <FieldError
+                                message={
+                                    form.formState.errors.amount?.message || ""
+                                }
+                            />
                         </div>
 
                         <div className="space-y-2">
@@ -226,15 +214,18 @@ export function AddExpenseForm({
                             <div className="flex gap-2">
                                 <div className="flex-1">
                                     <Select
-                                        value={categoryId}
-                                        onValueChange={setCategoryId}
+                                        value={form.watch("categoryId")}
+                                        onValueChange={(value) =>
+                                            form.setValue("categoryId", value)
+                                        }
                                     >
                                         <SelectTrigger
-                                            className={
-                                                fieldErrors.categoryId
+                                            className={cn(
+                                                form.formState.errors.categoryId
                                                     ? "border-red-500 focus:border-red-500"
-                                                    : ""
-                                            }
+                                                    : "",
+                                                "w-full"
+                                            )}
                                         >
                                             <SelectValue
                                                 placeholder={
@@ -266,7 +257,10 @@ export function AddExpenseForm({
                                 </div>
                                 <CreateCategoryModal
                                     onCategoryCreated={(newCategory) => {
-                                        setCategoryId(newCategory.id);
+                                        form.setValue(
+                                            "categoryId",
+                                            newCategory.id
+                                        );
                                     }}
                                 >
                                     <Button
@@ -279,7 +273,12 @@ export function AddExpenseForm({
                                     </Button>
                                 </CreateCategoryModal>
                             </div>
-                            <FieldError message={fieldErrors.categoryId} />
+                            <FieldError
+                                message={
+                                    form.formState.errors.categoryId?.message ||
+                                    ""
+                                }
+                            />
                         </div>
                     </div>
 
@@ -296,15 +295,18 @@ export function AddExpenseForm({
                         <Input
                             id="description"
                             placeholder="What did you spend on?"
-                            value={description}
-                            onChange={(e) => setDescription(e.target.value)}
+                            {...form.register("description")}
                             className={
-                                fieldErrors.description
+                                form.formState.errors.description
                                     ? "border-red-500 focus:border-red-500"
                                     : ""
                             }
                         />
-                        <FieldError message={fieldErrors.description} />
+                        <FieldError
+                            message={
+                                form.formState.errors.description?.message || ""
+                            }
+                        />
                     </div>
 
                     <div className="space-y-2">
@@ -314,15 +316,16 @@ export function AddExpenseForm({
                         <Input
                             id="date"
                             type="date"
-                            value={date}
-                            onChange={(e) => setDate(e.target.value)}
+                            {...form.register("date")}
                             className={
-                                fieldErrors.date
+                                form.formState.errors.date
                                     ? "border-red-500 focus:border-red-500"
                                     : ""
                             }
                         />
-                        <FieldError message={fieldErrors.date} />
+                        <FieldError
+                            message={form.formState.errors.date?.message || ""}
+                        />
                     </div>
 
                     <div className="space-y-2">
@@ -335,16 +338,17 @@ export function AddExpenseForm({
                         <Textarea
                             id="note"
                             placeholder="Additional notes (optional)"
-                            value={note}
-                            onChange={(e) => setNote(e.target.value)}
+                            {...form.register("note")}
                             rows={3}
                             className={
-                                fieldErrors.note
+                                form.formState.errors.note
                                     ? "border-red-500 focus:border-red-500"
                                     : ""
                             }
                         />
-                        <FieldError message={fieldErrors.note} />
+                        <FieldError
+                            message={form.formState.errors.note?.message || ""}
+                        />
                     </div>
 
                     <div className="space-y-2">

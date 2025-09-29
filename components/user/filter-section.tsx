@@ -141,7 +141,9 @@ export function FilterSection({
                             </SelectContent>
                         </Select>
                     </div>
+                </div>
 
+                <div className="flex flex-col lg:flex-row gap-4">
                     {/* Date Range */}
                     <div className="flex-1 min-w-0 space-y-2">
                         <label className="text-sm font-medium">
@@ -153,7 +155,7 @@ export function FilterSection({
                                     <Button
                                         variant="outline"
                                         className={cn(
-                                            "w-full justify-start text-left font-normal",
+                                            "w-full justify-start text-left font-normal flex-1",
                                             !localStartDate &&
                                                 "text-muted-foreground"
                                         )}
@@ -165,7 +167,7 @@ export function FilterSection({
                                     </Button>
                                 </PopoverTrigger>
                                 <PopoverContent
-                                    className="w-auto p-0"
+                                    className="w-auto  p-0"
                                     align="start"
                                 >
                                     <CalendarComponent
@@ -181,7 +183,7 @@ export function FilterSection({
                                     <Button
                                         variant="outline"
                                         className={cn(
-                                            "w-full justify-start text-left font-normal",
+                                            "w-full justify-start text-left font-normal flex-1",
                                             !localEndDate &&
                                                 "text-muted-foreground"
                                         )}

@@ -2,7 +2,6 @@ import type React from "react";
 import type { Metadata } from "next";
 import { GeistSans } from "geist/font/sans";
 import { GeistMono } from "geist/font/mono";
-import { Analytics } from "@vercel/analytics/next";
 import { SessionProviderWrapper } from "./providers/session-provider";
 import { QueryProvider } from "./providers/query-provider";
 import { Toaster } from "@/components/ui/toaster";
@@ -35,7 +34,6 @@ export default function RootLayout({
                     </SessionProviderWrapper>
                 </Suspense>
                 <Toaster />
-                <Analytics />
             </body>
         </html>
     );

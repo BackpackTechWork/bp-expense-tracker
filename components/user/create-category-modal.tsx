@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -14,6 +16,7 @@ import {
 } from "@/components/ui/dialog";
 import { Loader } from "@/components/ui/loader";
 import { ErrorMessage } from "@/components/ui/error-message";
+import { FieldError } from "@/components/ui/field-error";
 import { Plus } from "lucide-react";
 import { useCreateCategory } from "@/hooks/use-categories";
 import {
@@ -31,61 +34,42 @@ export function CreateCategoryModal({
     onCategoryCreated,
 }: CreateCategoryModalProps) {
     const [isOpen, setIsOpen] = useState(false);
-    const [formData, setFormData] = useState({
-        name: "",
-        color: "#DC143C",
-        icon: "",
-    });
-    const [errors, setErrors] = useState<Record<string, string>>({});
+    const [error, setError] = useState("");
 
     const createCategoryMutation = useCreateCategory();
 
-    const handleInputChange = (field: string, value: string) => {
-        setFormData((prev) => ({ ...prev, [field]: value }));
-        if (errors[field]) {
-            setErrors((prev) => ({ ...prev, [field]: "" }));
-        }
-    };
+    const form = useForm<CreateCategoryData>({
+        resolver: zodResolver(createCategorySchema),
+        defaultValues: {
+            name: "",
+            color: "#DC143C",
+            icon: "",
+        },
+    });
 
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        setErrors({});
-
-        // Validate with Zod
-        const validationResult = createCategorySchema.safeParse(formData);
-
-        if (!validationResult.success) {
-            const newErrors: Record<string, string> = {};
-            validationResult.error.errors.forEach((error) => {
-                if (error.path[0]) {
-                    newErrors[error.path[0] as string] = error.message;
-                }
-            });
-            setErrors(newErrors);
-            return;
-        }
-
-        createCategoryMutation.mutate(validationResult.data, {
+    const onSubmit = (data: CreateCategoryData) => {
+        setError("");
+        createCategoryMutation.mutate(data, {
             onSuccess: (data) => {
-                setFormData({ name: "", color: "#DC143C", icon: "" });
+                form.reset();
                 setIsOpen(false);
                 onCategoryCreated?.(data);
             },
             onError: (error) => {
                 if (error.message.includes("already exists")) {
-                    setErrors({
-                        name: "Category with this name already exists",
+                    form.setError("name", {
+                        message: "Category with this name already exists",
                     });
                 } else {
-                    setErrors({ general: error.message });
+                    setError(error.message);
                 }
             },
         });
     };
 
     const handleCancel = () => {
-        setFormData({ name: "", color: "#DC143C", icon: "" });
-        setErrors({});
+        form.reset();
+        setError("");
         setIsOpen(false);
     };
 
@@ -106,57 +90,72 @@ export function CreateCategoryModal({
                         Add a new expense category to organize your spending
                     </DialogDescription>
                 </DialogHeader>
-                <form onSubmit={handleSubmit} className="space-y-4">
-                    <div>
-                        <Label htmlFor="categoryName">Category Name *</Label>
+                <form
+                    onSubmit={form.handleSubmit(onSubmit)}
+                    className="space-y-4"
+                >
+                    <div className="space-y-2">
+                        <Label htmlFor="categoryName text-sm font-medium">
+                            Category Name
+                            <span className="text-red-500">*</span>
+                        </Label>
                         <Input
                             id="categoryName"
-                            value={formData.name}
-                            onChange={(e) =>
-                                handleInputChange("name", e.target.value)
-                            }
+                            {...form.register("name")}
                             placeholder="e.g., Groceries, Entertainment"
-                            className={errors.name ? "border-red-500" : ""}
+                            className={
+                                form.formState.errors.name
+                                    ? "border-red-500 focus:border-red-500"
+                                    : ""
+                            }
                         />
-                        <ErrorMessage message={errors.name} />
+                        <FieldError
+                            message={form.formState.errors.name?.message || ""}
+                        />
                     </div>
 
-                    <div>
+                    <div className="space-y-2">
                         <Label htmlFor="categoryColor">Color</Label>
                         <div className="flex items-center space-x-2">
                             <Input
                                 id="categoryColor"
                                 type="color"
-                                value={formData.color}
-                                onChange={(e) =>
-                                    handleInputChange("color", e.target.value)
-                                }
+                                {...form.register("color")}
                                 className="w-16 h-10 p-1 border rounded"
                             />
                             <Input
-                                value={formData.color}
-                                onChange={(e) =>
-                                    handleInputChange("color", e.target.value)
-                                }
+                                {...form.register("color")}
                                 placeholder="#DC143C"
-                                className="flex-1"
+                                className={`flex-1 ${
+                                    form.formState.errors.color
+                                        ? "border-red-500 focus:border-red-500"
+                                        : ""
+                                }`}
                             />
                         </div>
-                    </div>
-
-                    <div>
-                        <Label htmlFor="categoryIcon">Icon (Optional)</Label>
-                        <Input
-                            id="categoryIcon"
-                            value={formData.icon}
-                            onChange={(e) =>
-                                handleInputChange("icon", e.target.value)
-                            }
-                            placeholder="e.g., 🛒, 🎬, 🚗"
+                        <FieldError
+                            message={form.formState.errors.color?.message || ""}
                         />
                     </div>
 
-                    <ErrorMessage message={errors.general} />
+                    <div className="space-y-2">
+                        <Label htmlFor="categoryIcon">Icon (Optional)</Label>
+                        <Input
+                            id="categoryIcon"
+                            {...form.register("icon")}
+                            placeholder="e.g., 🛒, 🎬, 🚗"
+                            className={
+                                form.formState.errors.icon
+                                    ? "border-red-500 focus:border-red-500"
+                                    : ""
+                            }
+                        />
+                        <FieldError
+                            message={form.formState.errors.icon?.message || ""}
+                        />
+                    </div>
+
+                    <ErrorMessage message={error} />
 
                     <div className="flex justify-end space-x-2 pt-4">
                         <Button
